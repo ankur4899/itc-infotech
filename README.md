@@ -2,7 +2,7 @@
 
 #Steps to Run application
 
-`1 Clone the application using git clone <clone url>`
+`1 Clone the application using git clone https://github.com/ankur4899/itc-infotech.git`
 
 `2 Make sure you have nodejs installed and mongodb running`
 
