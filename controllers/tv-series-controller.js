@@ -1,5 +1,6 @@
 const tvSeriesModel = require('../models/tv-series-model');
 const tvSeriesHelper = require('../helpers/tv-series-helper');
+const tvSeriesExternalServiceHelper = require('../service/tv-series-external.service');
 
 module.exports = {
 
@@ -19,11 +20,11 @@ module.exports = {
         }
 
         //Get All Tv Season
-        const tvDetails = await tvSeriesHelper.getSeriesById(seriesId).catch((err) => {
-            return next(err)
+        const tvDetails = await tvSeriesExternalServiceHelper.getSeriesById(seriesId).catch((err) => {
+            return res.status(404).send({ error: { name: err.name, message: err.message } })
         });
 
-        if (tvDetails) {
+        if (tvDetails && tvDetails.id) {
             const tvObj = {
                 id: tvDetails.id,
                 name: tvDetails.name,
@@ -35,43 +36,44 @@ module.exports = {
             }
 
             //Get All Episodes of Season
-            const getEpisodesOfAllSeason = await tvSeriesHelper.getAllSeasonEpisodes(seriesId, tvObj.seasons).catch((err) => {
-                return next(err)
+            let isErrorOnFetchEpisodes = false;
+            const getEpisodesOfAllSeason = await tvSeriesExternalServiceHelper.getAllSeasonEpisodes(seriesId, tvObj.seasons).catch((err) => {
+                isErrorOnFetchEpisodes = true;
+                return res.status(404).send({ error: { name: err.name, message: err.message } })
             });;
 
-            let episodes = []
-            if (getEpisodesOfAllSeason) {
-                for (let i = 0; i < getEpisodesOfAllSeason.length; i++) {
-                    for (let j = 0; j < getEpisodesOfAllSeason[i].episodes.length; j++) {
-                        episodes.push(
-                            {
-                                episodeName: getEpisodesOfAllSeason[i].episodes[j].name,
-                                averageVotes: getEpisodesOfAllSeason[i].episodes[j].vote_average * getEpisodesOfAllSeason[i].episodes[j].vote_count
-                            });
+            if (!isErrorOnFetchEpisodes) {
+                let episodes = []
+                if (getEpisodesOfAllSeason) {
+                    for (let i = 0; i < getEpisodesOfAllSeason.length; i++) {
+                        for (let j = 0; j < getEpisodesOfAllSeason[i].episodes.length; j++) {
+                            episodes.push(
+                                {
+                                    episodeName: getEpisodesOfAllSeason[i].episodes[j].name,
+                                    averageVotes: getEpisodesOfAllSeason[i].episodes[j].vote_average * getEpisodesOfAllSeason[i].episodes[j].vote_count
+                                });
 
+                        }
+                    }
+                }
+                //Sorting and taking only top 20 episodes
+                tvObj.episodes = episodes.sort(tvSeriesHelper.compare).slice(0, 20);
+
+                if (isDataExist) {
+                    //Update exisiting data
+                    const data = await tvSeriesModel.findOneAndUpdate({ id: tvDetails.id }, tvObj).catch((err) => { return next(err) });
+                    if (data) {
+                        res.json({ "episodes": data.episodes });
+                    }
+                }
+                else {
+                    //Create New Record
+                    const data = await tvSeriesModel.create(tvObj).catch((err) => { return next(err) });
+                    if (data) {
+                        res.json({ "episodes": data.episodes });
                     }
                 }
             }
-
-            //Sorting and taking only top 20 episodes
-            tvObj.episodes = episodes.sort(tvSeriesHelper.compare).slice(0, 20);
-
-            if (isDataExist) {
-                //Update exisiting data
-                const data = await tvSeriesModel.findOneAndUpdate({ id: tvDetails.id }, tvObj).catch((err) => { return next(err) });
-                if (data) {
-                    res.json({ "episodes": data.episodes });
-                }
-            }
-            else {
-                //Create New Record
-                const data = await tvSeriesModel.create(tvObj).catch((err) => { return next(err) });
-                if (data) {
-                    res.json({ "episodes": data.episodes });
-                }
-            }
-
         }
-
     }
 }
