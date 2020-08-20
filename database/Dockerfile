@@ -1,0 +1,3 @@
+ARG VERSION=4.4
+FROM mongo:${VERSION}
+USER mongodb
